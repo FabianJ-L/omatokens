@@ -126,6 +126,7 @@ private slots:
         QCOMPARE(backend.heatmap()[1 * 24 + 9].toLongLong(), 180); // Tuesday, 9:00
 
         backend.setPeriod(Backend::Week);
+        // Last Tuesday 9:30 falls inside "last week up to Tuesday 18:00".
         QCOMPARE(backend.summary()["previousTotal"].toLongLong(), 15);
         backend.shift(1); // No future weeks.
         QCOMPARE(backend.offset(), 0);
@@ -136,6 +137,36 @@ private slots:
         backend.setAgentFilter("Codex");
         QCOMPARE(backend.summary()["total"].toLongLong(), 30);
         QCOMPARE(backend.models()[0].toMap()["name"].toString(), QString("codex"));
+    }
+
+    void runningPeriodComparesTheSameStretch()
+    {
+        QTemporaryDir claude;
+        auto at = [](QDate d, QTime t) { return QDateTime(d, t).toUTC().toString(Qt::ISODateWithMs).toUtf8(); };
+        write(claude.filePath("a.jsonl"), claudeLine("m1", at({2026, 11, 10}, {9, 0}), 10, 0)
+                                              + claudeLine("m2", at({2026, 11, 10}, {20, 0}), 100, 0));
+        Backend backend({claude.path()}, {});
+        backend.setClock(QDateTime(QDate(2026, 11, 17), QTime(12, 0)));
+        backend.loadNow();
+        backend.setPeriod(Backend::Week);
+        // Last Tuesday 20:00 is later in the week than now, so it's left out.
+        QCOMPARE(backend.summary()["previousTotal"].toLongLong(), 10);
+        backend.shift(-1);
+        QCOMPARE(backend.summary()["previousTotal"].toLongLong(), 0);
+    }
+
+    void unchangedPollStaysQuiet()
+    {
+        QTemporaryDir claude;
+        write(claude.filePath("a.jsonl"), claudeLine("m1", "2026-11-17T09:00:00.000Z", 10, 20));
+        Backend backend({claude.path()}, {});
+        backend.setClock(QDateTime(QDate(2026, 11, 17), QTime(12, 0)));
+        backend.loadNow();
+        QSignalSpy changed(&backend, &Backend::changed);
+        QSignalSpy updated(&backend, &Backend::updated);
+        backend.loadNow();
+        QCOMPARE(changed.count(), 0);
+        QCOMPARE(updated.count(), 1);
     }
 
     void compactNumbers()

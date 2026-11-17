@@ -61,16 +61,24 @@ void Theme::refreshRounding() {
     m_roundingTimeout.start();
 }
 
-QString Theme::readAccent(const QString &path) {
+QString Theme::readAccent(const QString &path) { return readColor(path, "accent", "#FFD60A"); }
+
+QString Theme::readColor(const QString &path, const QString &key, const QString &fallback) {
     QFile file(path);
     if (file.open(QIODevice::ReadOnly)) {
-        const QRegularExpression expression(R"re(^\s*accent\s*=\s*["'](#[0-9a-fA-F]{6})["'])re",
+        const QRegularExpression expression(QString(R"re(^\s*%1\s*=\s*["'](#[0-9a-fA-F]{6})["'])re").arg(key),
                                             QRegularExpression::MultilineOption);
         const auto match = expression.match(QString::fromUtf8(file.readAll()));
         if (match.hasMatch())
             return match.captured(1);
     }
-    return "#FFD60A";
+    return fallback;
+}
+
+QColor Theme::mix(double amount) const {
+    return QColor::fromRgbF(m_background.redF() + (m_foreground.redF() - m_background.redF()) * amount,
+                            m_background.greenF() + (m_foreground.greenF() - m_background.greenF()) * amount,
+                            m_background.blueF() + (m_foreground.blueF() - m_background.blueF()) * amount);
 }
 
 // Black or white, whichever reads on the accent (WCAG relative luminance).
@@ -100,9 +108,14 @@ void Theme::reload() {
         if (QFileInfo::exists(path))
             m_watcher.addPath(path);
 
-    const auto accent = readAccent(m_directory + "/theme/colors.toml");
-    if (accent != m_accent) {
+    const QString colors = m_directory + "/theme/colors.toml";
+    const auto accent = readAccent(colors);
+    const QColor background(readColor(colors, "background", "#0e0e10"));
+    const QColor foreground(readColor(colors, "foreground", "#ececef"));
+    if (accent != m_accent || background != m_background || foreground != m_foreground) {
         m_accent = accent;
+        m_background = background;
+        m_foreground = foreground;
         emit changed();
     }
 }

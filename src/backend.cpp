@@ -97,6 +97,7 @@ void Backend::finishScan() {
     m_updatedAt = QDateTime::currentDateTime();
     m_loading = false;
     emit loadingChanged();
+    emit updated();
     recompute();
     if (m_rescan) {
         m_rescan = false;
@@ -108,6 +109,7 @@ void Backend::loadNow() {
     m_cache = Usage::scan(m_claudeRoots, m_codexRoots, m_cache);
     m_records = Usage::merge(m_cache);
     m_updatedAt = QDateTime::currentDateTime();
+    emit updated();
     recompute();
 }
 
@@ -128,7 +130,8 @@ void Backend::setPeriod(int period) {
         return;
     m_period = period;
     m_offset = 0;
-    recompute();
+    rebuild();
+    emit changed();
 }
 
 void Backend::setOffset(int offset) {
@@ -137,7 +140,8 @@ void Backend::setOffset(int offset) {
     if (offset == m_offset)
         return;
     m_offset = offset;
-    recompute();
+    rebuild();
+    emit changed();
 }
 
 void Backend::shift(int steps) { setOffset(m_offset + steps); }
@@ -146,7 +150,8 @@ void Backend::setAgentFilter(const QString &agent) {
     if (agent == m_agentFilter)
         return;
     m_agentFilter = agent;
-    recompute();
+    rebuild();
+    emit changed();
 }
 
 bool Backend::matches(const UsageRecord &record) const {
@@ -246,49 +251,88 @@ Backend::Range Backend::periodRange(int period, int offset, const QDateTime &now
 }
 
 void Backend::recompute() {
+    if (rebuild())
+        emit changed();
+}
+
+bool Backend::rebuild() {
     const QDateTime current = now();
     const qint64 first = m_records.isEmpty() ? 0 : m_records.first().time;
 
     QSet<QString> agentSet;
     for (const UsageRecord &r : m_records)
         agentSet.insert(r.agent);
-    m_agents = QStringList(agentSet.begin(), agentSet.end());
-    std::sort(m_agents.begin(), m_agents.end());
+    QStringList agents(agentSet.begin(), agentSet.end());
+    std::sort(agents.begin(), agents.end());
 
-    auto sumBetween = [&](const QDateTime &start, const QDateTime &end) {
+    // Records are sorted by time, so each bucket's records are found by
+    // bisecting the bucket starts.
+    auto sumBuckets = [&](const Range &range, Sum *total) {
+        QVector<Sum> sums(range.buckets.size());
+        QVector<qint64> starts;
+        for (const Bucket &b : range.buckets)
+            starts.append(b.start.toMSecsSinceEpoch());
+        const qint64 from = range.start.toMSecsSinceEpoch(), to = range.end.toMSecsSinceEpoch();
+        for (const UsageRecord &r : m_records) {
+            if (r.time < from || r.time >= to || !matches(r))
+                continue;
+            if (total)
+                total->add(r);
+            const auto it = std::upper_bound(starts.cbegin(), starts.cend(), r.time);
+            if (it != starts.cbegin())
+                sums[int(it - starts.cbegin()) - 1].add(r);
+        }
+        return sums;
+    };
+    auto totalOf = [&](const Range &range) {
         Sum sum;
-        const qint64 from = start.toMSecsSinceEpoch(), to = end.toMSecsSinceEpoch();
+        const qint64 from = range.start.toMSecsSinceEpoch(), to = range.end.toMSecsSinceEpoch();
         for (const UsageRecord &r : m_records)
             if (r.time >= from && r.time < to && matches(r))
                 sum.add(r);
         return sum;
     };
 
-    m_overview.clear();
+    // A period still running is compared with the same stretch of the one
+    // before (Monday to Tuesday 11:00 against last Monday to Tuesday 11:00),
+    // not with all of it.
+    auto previousTotal = [&](int period, int offset) -> qint64 {
+        if (period == AllTime)
+            return -1;
+        const Range now = periodRange(period, offset, current, first);
+        Range before = periodRange(period, offset - 1, current, first);
+        if (now.start <= current && current < now.end)
+            before.end = std::min(before.end, before.start.addMSecs(now.start.msecsTo(current)));
+        return totalOf(before).total();
+    };
+
+    // Each tile carries its own trend: hours of today, days of the week and
+    // month, and the whole history.
+    QVariantMap overview;
     const char *names[] = {"today", "week", "month", "all"};
     for (int p = Today; p <= AllTime; ++p) {
         const Range r = periodRange(p, 0, current, first);
-        m_overview[names[p]] = sumBetween(r.start, r.end).toMap();
+        Sum total;
+        const QVector<Sum> sums = sumBuckets(r, &total);
+        QVariantMap item = total.toMap();
+        item["previousTotal"] = previousTotal(p, 0);
+        QVariantList series;
+        for (int i = 0; i < sums.size(); ++i)
+            series.append(r.buckets[i].start > current ? qint64(-1) : sums[i].total());
+        item["series"] = series;
+        overview[names[p]] = item;
     }
 
     const Range range = periodRange(m_period, m_offset, current, first);
-    m_periodTitle = range.title;
+    Sum total;
+    const QVector<Sum> bucketSums = sumBuckets(range, &total);
 
-    QVector<Sum> bucketSums(range.buckets.size());
-    QVector<qint64> bucketStarts;
-    for (const Bucket &b : range.buckets)
-        bucketStarts.append(b.start.toMSecsSinceEpoch());
     QHash<QString, Sum> byModel, byProject, byAgent;
     QVector<qint64> heat(7 * 24, 0);
-    Sum total;
     const qint64 from = range.start.toMSecsSinceEpoch(), to = range.end.toMSecsSinceEpoch();
     for (const UsageRecord &r : m_records) {
         if (r.time < from || r.time >= to || !matches(r))
             continue;
-        total.add(r);
-        const auto it = std::upper_bound(bucketStarts.cbegin(), bucketStarts.cend(), r.time);
-        if (it != bucketStarts.cbegin())
-            bucketSums[int(it - bucketStarts.cbegin()) - 1].add(r);
         byModel[r.model].add(r);
         byProject[r.project.isEmpty() ? tr("Unknown") : r.project].add(r);
         byAgent[r.agent].add(r);
@@ -296,29 +340,43 @@ void Backend::recompute() {
         heat[(local.date().dayOfWeek() - 1) * 24 + local.time().hour()] += r.total();
     }
 
-    m_summary = total.toMap();
-    if (m_period != AllTime) {
-        const Range previous = periodRange(m_period, m_offset - 1, current, first);
-        m_summary["previousTotal"] = sumBetween(previous.start, previous.end).total();
-    } else {
-        m_summary["previousTotal"] = qint64(-1);
-    }
+    QVariantMap summary = total.toMap();
+    summary["previousTotal"] = previousTotal(m_period, m_offset);
 
-    m_buckets.clear();
+    QVariantList buckets;
+    int elapsed = 0;
     for (int i = 0; i < range.buckets.size(); ++i) {
         QVariantMap item = bucketSums[i].toMap();
         item["label"] = range.buckets[i].label;
         item["detail"] = range.buckets[i].detail;
         item["current"] = range.buckets[i].start <= current && current < range.buckets[i].end;
-        m_buckets.append(item);
+        item["future"] = range.buckets[i].start > current;
+        if (range.buckets[i].start <= current)
+            ++elapsed;
+        buckets.append(item);
     }
+    // The average over the buckets that have begun, so a Tuesday morning
+    // isn't measured against a whole week.
+    summary["average"] = elapsed ? double(total.total()) / elapsed : 0.0;
 
-    m_models = ranked(byModel, total.total(), 6, tr("Other"));
-    m_projects = ranked(byProject, total.total(), 6, tr("Other"));
-    m_agentShares = ranked(byAgent, total.total(), 6, tr("Other"));
-    m_heatmap.clear();
+    const QVariantList models = ranked(byModel, total.total(), 6, tr("Other"));
+    const QVariantList projects = ranked(byProject, total.total(), 6, tr("Other"));
+    const QVariantList agentShares = ranked(byAgent, total.total(), 6, tr("Other"));
+    QVariantList heatmap;
     for (qint64 v : heat)
-        m_heatmap.append(v);
+        heatmap.append(v);
 
-    emit changed();
+    const bool same = agents == m_agents && range.title == m_periodTitle && overview == m_overview
+                      && summary == m_summary && buckets == m_buckets && models == m_models
+                      && projects == m_projects && agentShares == m_agentShares && heatmap == m_heatmap;
+    m_agents = agents;
+    m_periodTitle = range.title;
+    m_overview = overview;
+    m_summary = summary;
+    m_buckets = buckets;
+    m_models = models;
+    m_projects = projects;
+    m_agentShares = agentShares;
+    m_heatmap = heatmap;
+    return !same;
 }

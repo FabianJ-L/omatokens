@@ -1,8 +1,9 @@
 import QtQuick
 
 Rectangle {
-    color: Colors.card
-    border.color: Colors.line
+    color: theme.surface
+    border.color: theme.border
     border.width: 1
     radius: theme.radius
+    Behavior on color { ColorAnimation { duration: 200 } }
 }

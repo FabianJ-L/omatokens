@@ -1,4 +1,6 @@
 {
-  "%n requests": { "one": "%n request", "other": "%n requests" },
-  "%1 tokens · %n requests": { "one": "%1 tokens · %n request", "other": "%1 tokens · %n requests" }
+  "%n requests": {
+    "one": "%n request",
+    "other": "%n requests"
+  }
 }

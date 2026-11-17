@@ -1,13 +1,14 @@
 <RCC>
     <qresource prefix="/">
-        <file>qmldir</file>
         <file>Main.qml</file>
-        <file>Colors.qml</file>
+        <file>Tokens.js</file>
         <file>Card.qml</file>
-        <file>FilterChip.qml</file>
-        <file>PeriodTile.qml</file>
+        <file>AnimatedNumber.qml</file>
+        <file>DeltaPill.qml</file>
+        <file>Segmented.qml</file>
+        <file>StatTile.qml</file>
         <file>UsageChart.qml</file>
-        <file>BreakdownCard.qml</file>
+        <file>BreakdownList.qml</file>
         <file>ActivityHeatmap.qml</file>
         <file>HelpOverlay.qml</file>
         <file alias="i18n/en.json">i18n/en.json</file>

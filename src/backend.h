@@ -21,7 +21,7 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList agents READ agents NOTIFY changed)
     Q_PROPERTY(int recordCount READ recordCount NOTIFY changed)
     Q_PROPERTY(QString periodTitle READ periodTitle NOTIFY changed)
-    Q_PROPERTY(QString lastUpdated READ lastUpdated NOTIFY changed)
+    Q_PROPERTY(QString lastUpdated READ lastUpdated NOTIFY updated)
     Q_PROPERTY(QVariantMap summary READ summary NOTIFY changed)
     Q_PROPERTY(QVariantMap overview READ overview NOTIFY changed)
     Q_PROPERTY(QVariantList buckets READ buckets NOTIFY changed)
@@ -88,14 +88,19 @@ public:
     static Range periodRange(int period, int offset, const QDateTime &now, qint64 firstRecord);
 
 public slots:
+    // Recomputes and only announces a change when a number actually moved, so
+    // the quiet poll doesn't make the window rebuild or re-animate.
     void recompute();
 
 signals:
     void changed();
+    // Every finished read of the logs, changed or not.
+    void updated();
     void loadingChanged();
 
 private:
     void finishScan();
+    bool rebuild();
     QDateTime now() const;
     bool matches(const UsageRecord &record) const;
 
