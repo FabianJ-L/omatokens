@@ -1,0 +1,28 @@
+# Maintainer: FabianJ-L <https://github.com/FabianJ-L>
+pkgname=tokentally
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='See how many tokens Claude Code and Codex used, by day, week, and month'
+arch=('x86_64' 'aarch64')
+url='https://github.com/FabianJ-L/tokentally'
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland')
+makedepends=('gcc' 'make')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$pkgname-$pkgver"
+  mkdir -p build
+  cd build
+  qmake6 ../tokentally.pro
+  make
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 build/tokentally "$pkgdir/usr/bin/tokentally"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 pkgbuild/tokentally.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/tokentally.svg"
+  install -Dm644 pkgbuild/tokentally.desktop "$pkgdir/usr/share/applications/tokentally.desktop"
+}
