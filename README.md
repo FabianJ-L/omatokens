@@ -1,7 +1,7 @@
-# Token Tally
+# OmaTokens
 
-[![Build](https://github.com/FabianJ-L/tokentally/actions/workflows/build.yml/badge.svg)](https://github.com/FabianJ-L/tokentally/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/FabianJ-L/tokentally)](https://github.com/FabianJ-L/tokentally/releases/latest)
+[![Build](https://github.com/FabianJ-L/omatokens/actions/workflows/build.yml/badge.svg)](https://github.com/FabianJ-L/omatokens/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/FabianJ-L/omatokens)](https://github.com/FabianJ-L/omatokens/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A small desktop app for [Omarchy](https://omarchy.org) that shows how many
@@ -30,39 +30,42 @@ sent anywhere.
 
 Chats in Claude Desktop, on claude.ai, in ChatGPT, or in Gemini on the web
 keep no token counts on your computer, so they can't be counted as tokens.
-Claude Desktop does record the plan limits, which cover its chats too; Token
-Tally shows those.
+Claude Desktop does record the plan limits, which cover its chats too;
+OmaTokens shows those.
 
 ## Install
 
 On Omarchy (or any Arch Linux), paste this into a terminal:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/FabianJ-L/tokentally/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/FabianJ-L/omatokens/master/install.sh | bash
 ```
 
-It installs Qt 6 and the build tools with pacman, builds Token Tally, and
-installs it as a package. Then open **Token Tally** from the app launcher
-(`Super` + `Space`) or run `tokentally`.
+It installs Qt 6 and the build tools with pacman, builds OmaTokens, and
+installs it as a package. Then open **OmaTokens** from the app launcher
+(`Super` + `Space`) or run `omatokens`.
 
-**Prebuilt package (x86_64):** download `tokentally-*.pkg.tar.zst` from the
-[latest release](https://github.com/FabianJ-L/tokentally/releases/latest), then
+**Prebuilt package (x86_64):** download `omatokens-*.pkg.tar.zst` from the
+[latest release](https://github.com/FabianJ-L/omatokens/releases/latest), then
 
 ```sh
-sudo pacman -U tokentally-*.pkg.tar.zst
+sudo pacman -U omatokens-*.pkg.tar.zst
 ```
 
 **By hand:**
 
 ```sh
-git clone https://github.com/FabianJ-L/tokentally
-cd tokentally
+git clone https://github.com/FabianJ-L/omatokens
+cd omatokens
 bin/install
 ```
 
-**Uninstall:** `sudo pacman -R tokentally`
+**Uninstall:** `sudo pacman -R omatokens`
 
-**Update:** run `oma-update`. Every Oma app (Omasql, OmaTask, Token Tally)
+OmaTokens used to be called Token Tally (`tokentally`); `oma-update` swaps
+the old package for the new one.
+
+**Update:** run `oma-update`. Every Oma app (Omasql, OmaTask, OmaTokens)
 installs it; it updates all of them at once, from GitHub.
 
 ## Shortcuts
@@ -81,8 +84,8 @@ installs it; it updates all of them at once, from GitHub.
 ## Command line
 
 ```sh
-tokentally summary          # today, week, month, all time
-tokentally summary --json
+omatokens summary          # today, week, month, all time
+omatokens summary --json
 ```
 
 ## Build
@@ -90,7 +93,7 @@ tokentally summary --json
 Needs `qt6-base`, `qt6-declarative`, and `qt6-wayland`.
 
 ```sh
-bin/build      # build/tokentally
+bin/build      # build/omatokens
 bin/test       # tests, offscreen
 bin/install    # package and install, so it shows up in the launcher
 ```

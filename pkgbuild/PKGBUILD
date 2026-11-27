@@ -1,4 +1,4 @@
-pkgname=tokentally
+pkgname=omatokens
 pkgver=0.1.0
 pkgrel=1
 pkgdesc='See how many tokens Claude Code and Codex used, by day, week, and month'
@@ -18,10 +18,10 @@ build() {
 
 package() {
   cd "$startdir/.."
-  install -Dm755 build/tokentally "$pkgdir/usr/bin/tokentally"
+  install -Dm755 build/omatokens "$pkgdir/usr/bin/omatokens"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-  install -Dm644 "$startdir/tokentally.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/tokentally.svg"
-  install -Dm644 "$startdir/tokentally.desktop" "$pkgdir/usr/share/applications/tokentally.desktop"
+  install -Dm644 "$startdir/omatokens.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omatokens.svg"
+  install -Dm644 "$startdir/omatokens.desktop" "$pkgdir/usr/share/applications/omatokens.desktop"
   # oma-update and where this build came from, so it can update the app later.
   install -Dm755 "$startdir/oma-update" "$pkgdir/usr/share/oma-apps/$pkgname/oma-update"
   printf 'REPO=%s\nCOMMIT=%s\n' "https://github.com/FabianJ-L/$pkgname" \

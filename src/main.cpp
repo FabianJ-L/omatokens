@@ -1,4 +1,4 @@
-// tokentally — how many tokens AI coding agents spent, and when.
+// omatokens — how many tokens AI coding agents spent, and when.
 
 #include <QGuiApplication>
 #include <QIcon>
@@ -18,7 +18,7 @@
 
 namespace {
 
-// `tokentally summary [--json]` prints today, this week, this month, and all
+// `omatokens summary [--json]` prints today, this week, this month, and all
 // time without opening a window, so scripts and agents can read the numbers.
 int printSummary(Backend &backend, bool json) {
     backend.loadNow();
@@ -57,20 +57,20 @@ int printSummary(Backend &backend, bool json) {
 int main(int argc, char *argv[]) {
     const bool summary = argc > 1 && std::strcmp(argv[1], "summary") == 0;
     if (argc > 1 && !summary && std::strcmp(argv[1], "open") != 0) {
-        fprintf(stderr, "usage: tokentally [open | summary [--json]]\n");
+        fprintf(stderr, "usage: omatokens [open | summary [--json]]\n");
         return 1;
     }
     if (summary)
         qputenv("QT_QPA_PLATFORM", "offscreen");
 
     QGuiApplication app(argc, argv);
-    app.setApplicationName("tokentally");
+    app.setApplicationName("omatokens");
     app.setApplicationVersion("0.1.0");
 
-    // Matches the window to tokentally.desktop, so the compositor (Wayland
+    // Matches the window to omatokens.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
-    app.setDesktopFileName("tokentally");
-    app.setWindowIcon(QIcon::fromTheme("tokentally"));
+    app.setDesktopFileName("omatokens");
+    app.setWindowIcon(QIcon::fromTheme("omatokens"));
 
     // Installed before anything is translated, and every qsTr() binding is
     // re-evaluated when the Omarchy language changes.

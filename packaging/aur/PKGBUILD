@@ -1,10 +1,10 @@
 # Maintainer: FabianJ-L <https://github.com/FabianJ-L>
-pkgname=tokentally
+pkgname=omatokens
 pkgver=0.1.0
 pkgrel=1
 pkgdesc='See how many tokens Claude Code and Codex used, by day, week, and month'
 arch=('x86_64' 'aarch64')
-url='https://github.com/FabianJ-L/tokentally'
+url='https://github.com/FabianJ-L/omatokens'
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland')
 makedepends=('gcc' 'make')
@@ -15,14 +15,14 @@ build() {
   cd "$pkgname-$pkgver"
   mkdir -p build
   cd build
-  qmake6 ../tokentally.pro
+  qmake6 ../omatokens.pro
   make
 }
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 build/tokentally "$pkgdir/usr/bin/tokentally"
+  install -Dm755 build/omatokens "$pkgdir/usr/bin/omatokens"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-  install -Dm644 pkgbuild/tokentally.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/tokentally.svg"
-  install -Dm644 pkgbuild/tokentally.desktop "$pkgdir/usr/share/applications/tokentally.desktop"
+  install -Dm644 pkgbuild/omatokens.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/omatokens.svg"
+  install -Dm644 pkgbuild/omatokens.desktop "$pkgdir/usr/share/applications/omatokens.desktop"
 }

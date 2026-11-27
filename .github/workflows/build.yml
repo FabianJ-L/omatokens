@@ -28,11 +28,11 @@ jobs:
           chown -R builder .
           cd pkgbuild
           sudo -u builder makepkg -f --noconfirm
-          rm -f tokentally-debug-*.pkg.tar.zst
+          rm -f omatokens-debug-*.pkg.tar.zst
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tokentally-package
+          name: omatokens-package
           path: pkgbuild/*.pkg.tar.zst
 
       - name: Attach package to release
@@ -42,4 +42,4 @@ jobs:
         run: |
           pacman -S --noconfirm --needed github-cli
           git config --global --add safe.directory "$PWD"
-          gh release upload "$GITHUB_REF_NAME" pkgbuild/tokentally-*.pkg.tar.zst --clobber
+          gh release upload "$GITHUB_REF_NAME" pkgbuild/omatokens-*.pkg.tar.zst --clobber

@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=Token Tally
-Name[de]=Token Tally
+Name=OmaTokens
+Name[de]=OmaTokens
 Comment=See how many tokens Claude Code and Codex used, by day, week, and month
 Comment[de]=Token-Verbrauch von Claude Code und Codex nach Tag, Woche und Monat
-Exec=tokentally
-Icon=tokentally
+Exec=omatokens
+Icon=omatokens
 Terminal=false
 Categories=Utility;Development;
-StartupWMClass=tokentally
+StartupWMClass=omatokens

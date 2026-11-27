@@ -11,7 +11,7 @@ ApplicationWindow {
     minimumWidth: 780
     minimumHeight: 560
     visible: true
-    title: "Token Tally"
+    title: "OmaTokens"
     // See-through like the terminal, so Hyprland's blur shows behind it.
     color: Qt.alpha(theme.background, 0.72)
 
@@ -84,7 +84,7 @@ ApplicationWindow {
                     ColumnLayout {
                         spacing: 0
                         Label {
-                            text: "Token Tally"
+                            text: "OmaTokens"
                             font.pixelSize: 18
                             font.weight: Font.DemiBold
                             color: theme.text
@@ -444,7 +444,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                     color: theme.muted
-                    text: qsTr("Token Tally reads the logs that Claude Code, Codex, Gemini CLI, Qwen Code, and OpenCode write. None were found in:") + "\n" + backend.roots.join("\n")
+                    text: qsTr("OmaTokens reads the logs that Claude Code, Codex, Gemini CLI, Qwen Code, and OpenCode write. None were found in:") + "\n" + backend.roots.join("\n")
                 }
             }
         }

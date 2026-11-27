@@ -292,7 +292,7 @@ QVector<UsageRecord> Usage::parseOpenCodeDatabase(const QString &path) {
     // Scans run on worker threads, and a connection belongs to the thread
     // that made it, so each read gets its own.
     static QAtomicInt counter;
-    const QString connection = QStringLiteral("tokentally-opencode-%1").arg(counter.fetchAndAddRelaxed(1));
+    const QString connection = QStringLiteral("omatokens-opencode-%1").arg(counter.fetchAndAddRelaxed(1));
     {
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connection);
         db.setDatabaseName(path);

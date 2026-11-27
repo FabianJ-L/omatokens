@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build"
 cd "$ROOT/build"
 
-qmake6 "$ROOT/tokentally.pro"
+qmake6 "$ROOT/omatokens.pro"
 make -j"$(nproc)"
 
-echo "Built $ROOT/build/tokentally"
+echo "Built $ROOT/build/omatokens"

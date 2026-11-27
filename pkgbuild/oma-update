@@ -1,6 +1,6 @@
 #!/bin/bash
 # oma-update — installs the latest version of every Oma app on this computer
-# (Omasql, OmaTask, Token Tally, …) in one go.
+# (Omasql, OmaTask, OmaTokens, …) in one go.
 #
 #   oma-update                 update every Oma app that is installed
 #   oma-update omasql omatask  only these
@@ -17,7 +17,7 @@ set -uo pipefail
 
 # Raised with every change, so the newest copy of all installed apps is the
 # one on the PATH.
-OMA_UPDATE_VERSION=2
+OMA_UPDATE_VERSION=3
 
 REGISTRY="${OMA_APPS_REGISTRY:-/usr/share/oma-apps}"
 APPS_DIR="${OMA_APPS_DIR:-$HOME/Work}"
@@ -47,6 +47,12 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
+# Apps that were renamed: old package name -> new one. Updating the old one
+# installs the new one in its place.
+declare -A RENAMED=([tokentally]=omatokens)
+declare -A registry_of=() # app -> its folder in REGISTRY, when that's the old name's
+declare -A replaces=()    # app -> the old package it takes the place of
+
 # A git checkout of the app with its packaging, if there is one.
 checkout_of() {
   local dir="$APPS_DIR/$1"
@@ -55,7 +61,15 @@ checkout_of() {
 
 # KEY=value from an app's source file.
 source_field() {
-  [ -f "$REGISTRY/$1/source" ] && sed -n "s/^$2=//p" "$REGISTRY/$1/source" | head -n1
+  local file="$REGISTRY/${registry_of[$1]:-$1}/source"
+  [ -f "$file" ] && sed -n "s/^$2=//p" "$file" | head -n1
+}
+
+# The installed version, of the app or of the package it replaces.
+installed_version() {
+  local line
+  line="$(pacman -Q "$1" 2>/dev/null)" || { [ -n "${replaces[$1]:-}" ] && line="$(pacman -Q "${replaces[$1]}" 2>/dev/null)"; }
+  [ -n "$line" ] && echo "${line#* }"
 }
 
 # Installed apps, plus checkouts in APPS_DIR (installed or not).
@@ -63,8 +77,14 @@ declare -A seen=()
 apps=()
 for file in "$REGISTRY"/*/source; do
   [ -f "$file" ] || continue
-  app="$(basename "$(dirname "$file")")"
-  pacman -Q "$app" >/dev/null 2>&1 || continue
+  old="$(basename "$(dirname "$file")")"
+  pacman -Q "$old" >/dev/null 2>&1 || continue
+  app="${RENAMED[$old]:-$old}"
+  if [ "$app" != "$old" ]; then
+    replaces[$app]="$old"
+    [ -f "$REGISTRY/$app/source" ] || registry_of[$app]="$old"
+  fi
+  [ -n "${seen[$app]:-}" ] && continue
   seen[$app]=1; apps+=("$app")
 done
 for pkgbuild in "$APPS_DIR"/*/pkgbuild/PKGBUILD; do
@@ -74,11 +94,20 @@ for pkgbuild in "$APPS_DIR"/*/pkgbuild/PKGBUILD; do
   seen[$app]=1; apps+=("$app")
 done
 
+# A checkout of a renamed app replaces the old package too, even one
+# installed before it carried oma-update.
+for old in "${!RENAMED[@]}"; do
+  new="${RENAMED[$old]}"
+  [ -n "${seen[$new]:-}" ] && pacman -Q "$old" >/dev/null 2>&1 && replaces[$new]="$old"
+done
+
 if [ ${#only[@]} -gt 0 ]; then
+  apps=()
   for name in "${only[@]}"; do
+    name="${RENAMED[$name]:-$name}"
     [ -n "${seen[$name]:-}" ] || { echo "${red}$name isn't an installed Oma app.${off}" >&2; exit 1; }
+    apps+=("$name")
   done
-  apps=("${only[@]}")
 fi
 
 if [ ${#apps[@]} -eq 0 ]; then
@@ -99,7 +128,7 @@ wanted_commit() {
 
 if [ $list -eq 1 ]; then
   for app in "${apps[@]}"; do
-    installed="$(pacman -Q "$app" 2>/dev/null | cut -d' ' -f2)"
+    installed="$(installed_version "$app")"
     have="$(source_field "$app" COMMIT)"
     want="$(wanted_commit "$app")"
     if [ -z "$installed" ]; then state="not installed"
@@ -182,6 +211,14 @@ if [ ${#packages[@]} -gt 0 ]; then
   echo "${bold}==> Installing ${built[*]}${off}"
   if sudo pacman -U --noconfirm "${packages[@]}"; then
     echo "${green}Updated: ${built[*]}${off}"
+    # Renamed apps: the new package is in, so the old one goes.
+    for app in "${built[@]}"; do
+      old="${replaces[$app]:-}"
+      if [ -n "$old" ] && pacman -Q "$old" >/dev/null 2>&1; then
+        echo "  $old is now called $app; removing the old package"
+        sudo pacman -R --noconfirm "$old" >/dev/null || echo "  ${yellow}couldn't remove $old${off}"
+      fi
+    done
     echo "${dim}Restart the apps that are open to use the new versions.${off}"
   else
     echo "${red}Installing failed.${off}" >&2

@@ -29,7 +29,7 @@ QByteArray codexCount(const char *time, int total, int input, int cached, int ou
 
 } // namespace
 
-class TokentallyTests : public QObject {
+class OmatokensTests : public QObject {
     Q_OBJECT
 
 private slots:
@@ -309,5 +309,5 @@ private:
     }
 };
 
-QTEST_MAIN(TokentallyTests)
-#include "tokentally_tests.moc"
+QTEST_MAIN(OmatokensTests)
+#include "omatokens_tests.moc"
