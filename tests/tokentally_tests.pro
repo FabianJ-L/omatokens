@@ -1,4 +1,4 @@
-QT += core gui quick quickcontrols2 testlib concurrent
+QT += core gui quick quickcontrols2 testlib concurrent sql
 CONFIG += c++17 testcase
 TARGET = tokentally_tests
 TEMPLATE = app

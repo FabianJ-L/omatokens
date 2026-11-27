@@ -11,7 +11,7 @@ Rectangle {
     implicitWidth: row.implicitWidth + 6
     implicitHeight: 32
     radius: Math.min(6, theme.radius)
-    color: theme.background
+    color: Qt.alpha(theme.background, 0.5)
     border.color: theme.border
 
     Rectangle {

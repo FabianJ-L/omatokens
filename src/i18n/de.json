@@ -31,7 +31,6 @@
   "When you use it": "Wann du es nutzt",
   "%1, %2:00 · %3 tokens": "%1, %2:00 Uhr · %3 Tokens",
   "No usage found": "Kein Verbrauch gefunden",
-  "Token Tally reads the logs Claude Code and Codex write. None were found in:": "Token Tally liest die Logs von Claude Code und Codex. In diesen Ordnern wurde keins gefunden:",
   "Keyboard shortcuts": "Tastenkürzel",
   "Previous or next period": "Vorheriger oder nächster Zeitraum",
   "Back to the current period": "Zurück zum aktuellen Zeitraum",
@@ -51,5 +50,14 @@
   "Hover a cell for details": "Fahr über ein Feld für Details",
   "less": "weniger",
   "more": "mehr",
-  "Compared with the same stretch of the previous period (%1)": "Im Vergleich zum gleichen Abschnitt des vorherigen Zeitraums (%1)"
+  "Compared with the same stretch of the previous period (%1)": "Im Vergleich zum gleichen Abschnitt des vorherigen Zeitraums (%1)",
+  "Token Tally reads the logs that Claude Code, Codex, Gemini CLI, Qwen Code, and OpenCode write. None were found in:": "Token Tally liest die Logs von Claude Code, Codex, Gemini CLI, Qwen Code und OpenCode. In diesen Ordnern wurde keins gefunden:",
+  "Claude plan limits": "Claude-Plan-Limits",
+  "From Claude Desktop · includes chats in the app and on claude.ai, and Claude Code": "Aus Claude Desktop · inklusive Chats in der App, auf claude.ai und Claude Code",
+  "as of %1": "Stand %1",
+  "5-hour limit": "5-Stunden-Limit",
+  "Weekly limit": "Wochenlimit",
+  "No reading in the last 5 hours": "Kein Messwert in den letzten 5 Stunden",
+  "No reading this week": "Kein Messwert diese Woche",
+  "Weekly limit, last 7 days": "Wochenlimit, letzte 7 Tage"
 }

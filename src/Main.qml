@@ -12,7 +12,8 @@ ApplicationWindow {
     minimumHeight: 560
     visible: true
     title: "Token Tally"
-    color: theme.background
+    // See-through like the terminal, so Hyprland's blur shows behind it.
+    color: Qt.alpha(theme.background, 0.72)
 
     Material.theme: Material.Dark
     Material.accent: theme.accent
@@ -80,27 +81,6 @@ ApplicationWindow {
                     Layout.bottomMargin: 4
                     spacing: 12
 
-                    Rectangle {
-                        implicitWidth: 30
-                        implicitHeight: 30
-                        radius: Math.min(8, theme.radius)
-                        color: theme.accent
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 2
-                            Repeater {
-                                model: [8, 13, 18]
-                                Rectangle {
-                                    required property int modelData
-                                    anchors.bottom: parent.bottom
-                                    width: 4
-                                    height: modelData
-                                    radius: 1
-                                    color: theme.accentForeground
-                                }
-                            }
-                        }
-                    }
                     ColumnLayout {
                         spacing: 0
                         Label {
@@ -170,6 +150,12 @@ ApplicationWindow {
                             onClicked: backend.period = index
                         }
                     }
+                }
+
+                // ── Claude plan limits, when Claude Desktop is installed ──
+                PlanCard {
+                    visible: Object.keys(backend.planUsage).length > 0
+                    Layout.fillWidth: true
                 }
 
                 // ── The selected period: headline numbers, then the chart ──
@@ -458,7 +444,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                     color: theme.muted
-                    text: qsTr("Token Tally reads the logs Claude Code and Codex write. None were found in:") + "\n" + backend.roots.join("\n")
+                    text: qsTr("Token Tally reads the logs that Claude Code, Codex, Gemini CLI, Qwen Code, and OpenCode write. None were found in:") + "\n" + backend.roots.join("\n")
                 }
             }
         }

@@ -1,4 +1,4 @@
-QT += core gui qml quick quickcontrols2 concurrent
+QT += core gui qml quick quickcontrols2 concurrent sql
 
 CONFIG += c++17 release
 TARGET = tokentally

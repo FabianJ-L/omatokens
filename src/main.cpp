@@ -1,4 +1,4 @@
-// tokentally — how many tokens Claude Code and Codex spent, and when.
+// tokentally — how many tokens AI coding agents spent, and when.
 
 #include <QGuiApplication>
 #include <QIcon>
@@ -7,6 +7,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <QTextStream>
 #include <QUrl>
 #include <cstring>
@@ -24,7 +25,12 @@ int printSummary(Backend &backend, bool json) {
     const QVariantMap overview = backend.overviewNow();
     QTextStream out(stdout);
     if (json) {
-        out << QJsonDocument(QJsonObject::fromVariantMap(overview)).toJson(QJsonDocument::Indented);
+        QVariantMap all = overview;
+        QVariantMap plan = backend.planUsage();
+        plan.remove("history");
+        if (!plan.isEmpty())
+            all["claudePlan"] = plan;
+        out << QJsonDocument(QJsonObject::fromVariantMap(all)).toJson(QJsonDocument::Indented);
         return 0;
     }
     const QList<QPair<QString, QString>> rows{{"today", "Today"}, {"week", "This week"},
@@ -38,6 +44,11 @@ int printSummary(Backend &backend, bool json) {
                         backend.compact(s["cacheWrite"].toDouble()), backend.compact(s["cacheRead"].toDouble()))
                    .arg(s["requests"].toLongLong());
     }
+    const QVariantMap plan = backend.planUsage();
+    auto percent = [](const QVariant &v) { return v.toInt() < 0 ? QStringLiteral("–") : QString::number(v.toInt()) + "%"; };
+    if (!plan.isEmpty())
+        out << QString("Claude plan  5-hour limit %1, weekly limit %2 (from Claude Desktop)\n")
+                   .arg(percent(plan["fiveHour"]), percent(plan["sevenDay"]));
     return 0;
 }
 
@@ -71,6 +82,9 @@ int main(int argc, char *argv[]) {
         return printSummary(backend, argc > 2 && std::strcmp(argv[2], "--json") == 0);
 
     QQuickStyle::setStyle("Material");
+    // A see-through window background, so Hyprland's blur shows behind the
+    // app the way it does behind the terminal.
+    QQuickWindow::setDefaultAlphaBuffer(true);
     Theme theme;
 
     QQmlApplicationEngine engine;

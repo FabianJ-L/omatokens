@@ -5,11 +5,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A small desktop app for [Omarchy](https://omarchy.org) that shows how many
-tokens Claude Code and Codex used, today, this week, this month, and in total,
-and when. It reads the logs the agents already write
-(`~/.claude/projects`, `~/.codex/sessions`), every agent and subagent
-included, and updates every 15 seconds while it's open. Nothing is sent
-anywhere.
+tokens your AI coding agents used, today, this week, this month, and in
+total, and when. It reads the logs the agents already write, every agent and
+subagent included, and updates every 15 seconds while it's open. Nothing is
+sent anywhere.
+
+| Agent | Logs |
+| --- | --- |
+| Claude Code | `~/.claude/projects` |
+| Codex | `~/.codex/sessions` |
+| Gemini CLI | `~/.gemini/tmp/*/chats` |
+| Qwen Code | `~/.qwen/tmp/*/chats`, `~/.qwen/projects/*/chats` |
+| OpenCode | `~/.local/share/opencode/opencode.db` (and the older `storage/message`) |
 
 - Totals for today, this week, this month, and all time
 - A stacked chart of the selected period (by hour, day, or week) split into
@@ -18,7 +25,13 @@ anywhere.
 - A weekday × hour heatmap of when you use it
 - Follows the Omarchy accent, window rounding, and language (English, German)
 
-Usage in claude.ai chats in the browser isn't in these logs and isn't counted.
+- With Claude Desktop installed, how much of your Claude plan's 5-hour and
+  weekly limits is used
+
+Chats in Claude Desktop, on claude.ai, in ChatGPT, or in Gemini on the web
+keep no token counts on your computer, so they can't be counted as tokens.
+Claude Desktop does record the plan limits, which cover its chats too; Token
+Tally shows those.
 
 ## Install
 

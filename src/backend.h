@@ -30,6 +30,7 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList agentShares READ agentShares NOTIFY changed)
     Q_PROPERTY(QVariantList heatmap READ heatmap NOTIFY changed)
     Q_PROPERTY(QStringList roots READ roots CONSTANT)
+    Q_PROPERTY(QVariantMap planUsage READ planUsage NOTIFY planUsageChanged)
 
 public:
     enum Period { Today, Week, Month, AllTime };
@@ -48,8 +49,8 @@ public:
         QVector<Bucket> buckets;
     };
 
-    explicit Backend(const QStringList &claudeRoots = Usage::defaultClaudeRoots(),
-                     const QStringList &codexRoots = Usage::defaultCodexRoots(), QObject *parent = nullptr);
+    explicit Backend(const Usage::Roots &roots = Usage::defaultRoots(),
+                     const QString &planFile = Usage::defaultPlanFile(), QObject *parent = nullptr);
     ~Backend() override;
 
     bool loading() const { return m_loading; }
@@ -67,7 +68,8 @@ public:
     QVariantList projects() const { return m_projects; }
     QVariantList agentShares() const { return m_agentShares; }
     QVariantList heatmap() const { return m_heatmap; }
-    QStringList roots() const { return m_claudeRoots + m_codexRoots; }
+    QStringList roots() const;
+    QVariantMap planUsage() const { return m_planUsage; }
 
     void setPeriod(int period);
     void setOffset(int offset);
@@ -97,15 +99,18 @@ signals:
     // Every finished read of the logs, changed or not.
     void updated();
     void loadingChanged();
+    void planUsageChanged();
 
 private:
     void finishScan();
     bool rebuild();
     QDateTime now() const;
     bool matches(const UsageRecord &record) const;
+    void readPlan();
 
-    QStringList m_claudeRoots;
-    QStringList m_codexRoots;
+    Usage::Roots m_roots;
+    QString m_planFile;
+    QVariantMap m_planUsage;
     ScanCache m_cache;
     QVector<UsageRecord> m_records;
     QFutureWatcher<ScanCache> m_scan;

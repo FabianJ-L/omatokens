@@ -63,8 +63,8 @@ QDateTime startOfDay(const QDate &date) { return date.startOfDay(); }
 
 } // namespace
 
-Backend::Backend(const QStringList &claudeRoots, const QStringList &codexRoots, QObject *parent)
-    : QObject(parent), m_claudeRoots(claudeRoots), m_codexRoots(codexRoots) {
+Backend::Backend(const Usage::Roots &roots, const QString &planFile, QObject *parent)
+    : QObject(parent), m_roots(roots), m_planFile(planFile) {
     connect(&m_scan, &QFutureWatcher<ScanCache>::finished, this, &Backend::finishScan);
     // Agents append to their logs as they work; a quiet poll that only
     // re-reads files whose size changed keeps the window current.
@@ -88,12 +88,13 @@ void Backend::refresh() {
         m_loading = true;
         emit loadingChanged();
     }
-    m_scan.setFuture(QtConcurrent::run(&Usage::scan, m_claudeRoots, m_codexRoots, m_cache));
+    m_scan.setFuture(QtConcurrent::run(&Usage::scan, m_roots, m_cache));
 }
 
 void Backend::finishScan() {
     m_cache = m_scan.result();
     m_records = Usage::merge(m_cache);
+    readPlan();
     m_updatedAt = QDateTime::currentDateTime();
     m_loading = false;
     emit loadingChanged();
@@ -106,11 +107,27 @@ void Backend::finishScan() {
 }
 
 void Backend::loadNow() {
-    m_cache = Usage::scan(m_claudeRoots, m_codexRoots, m_cache);
+    m_cache = Usage::scan(m_roots, m_cache);
     m_records = Usage::merge(m_cache);
+    readPlan();
     m_updatedAt = QDateTime::currentDateTime();
     emit updated();
     recompute();
+}
+
+QStringList Backend::roots() const {
+    QStringList paths;
+    for (const Usage::Root &root : m_roots)
+        paths << root.path;
+    return paths;
+}
+
+void Backend::readPlan() {
+    const QVariantMap plan = m_planFile.isEmpty() ? QVariantMap() : Usage::readPlanUsage(m_planFile, now().toMSecsSinceEpoch());
+    if (plan == m_planUsage)
+        return;
+    m_planUsage = plan;
+    emit planUsageChanged();
 }
 
 void Backend::setClock(const QDateTime &now) {

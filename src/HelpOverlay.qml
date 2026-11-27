@@ -15,6 +15,7 @@ Rectangle {
     TapHandler { onTapped: overlay.dismissed() }
 
     Card {
+        solid: true
         anchors.centerIn: parent
         width: Math.min(460, parent.width - 48)
         implicitHeight: column.implicitHeight + 48

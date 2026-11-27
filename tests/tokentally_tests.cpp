@@ -1,5 +1,7 @@
 #include <QDir>
 #include <QFile>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -41,7 +43,7 @@ private slots:
                         + claudeLine("msg_1", "2026-11-17T09:00:00.000Z", 10, 20, 100)
                         + claudeLine("msg_2", "2026-11-17T10:00:00.000Z", 1, 2, 0, "<synthetic>")
                         + R"({"type":"user","message":{"content":"what is my usage"}})" "\n");
-        const auto records = Usage::merge(Usage::scan({dir.path()}, {}, {}));
+        const auto records = Usage::merge(Usage::scan({{Usage::Claude, dir.path()}}, {}));
         QCOMPARE(records.size(), 1);
         QCOMPARE(records[0].total(), qint64(130));
         QCOMPARE(records[0].project, QString("shop"));
@@ -54,7 +56,7 @@ private slots:
         write(dir.filePath("a.jsonl"), claudeLine("msg_1", "2026-11-17T09:00:00.000Z", 10, 20));
         write(dir.filePath("b.jsonl"), claudeLine("msg_1", "2026-11-17T09:00:00.000Z", 10, 20)
                                            + claudeLine("msg_2", "2026-11-17T09:05:00.000Z", 1, 1));
-        QCOMPARE(Usage::merge(Usage::scan({dir.path()}, {}, {})).size(), 2);
+        QCOMPARE(Usage::merge(Usage::scan({{Usage::Claude, dir.path()}}, {})).size(), 2);
     }
 
     void codexSplitsCachedInputAndSkipsRepeats()
@@ -65,7 +67,7 @@ private slots:
               + codexCount("2026-11-17T09:00:00.000Z", 1100, 1000, 800, 100)
               + codexCount("2026-11-17T09:00:01.000Z", 1100, 1000, 800, 100)
               + codexCount("2026-11-17T09:01:00.000Z", 1350, 200, 150, 50));
-        const auto records = Usage::merge(Usage::scan({}, {dir.path()}, {}));
+        const auto records = Usage::merge(Usage::scan({{Usage::Codex, dir.path()}}, {}));
         QCOMPARE(records.size(), 2);
         QCOMPARE(records[0].input, qint64(200));
         QCOMPARE(records[0].cacheRead, qint64(800));
@@ -79,10 +81,10 @@ private slots:
         QTemporaryDir dir;
         const QString path = dir.filePath("a.jsonl");
         write(path, claudeLine("msg_1", "2026-11-17T09:00:00.000Z", 10, 20));
-        ScanCache cache = Usage::scan({dir.path()}, {}, {});
+        ScanCache cache = Usage::scan({{Usage::Claude, dir.path()}}, {});
         // Poison the cached copy: an unchanged file must not be read again.
         cache[QFileInfo(path).canonicalFilePath()].records[0].output = 999;
-        cache = Usage::scan({dir.path()}, {}, cache);
+        cache = Usage::scan({{Usage::Claude, dir.path()}}, cache);
         QCOMPARE(Usage::merge(cache)[0].output, qint64(999));
     }
 
@@ -113,7 +115,7 @@ private slots:
                                               + claudeLine("m2", lastWeek.toUtf8(), 10, 5));
         write(codex.filePath("b.jsonl"), codexCount(local.toUtf8(), 30, 20, 0, 10));
 
-        Backend backend({claude.path()}, {codex.path()});
+        Backend backend({{Usage::Claude, claude.path()}, {Usage::Codex, codex.path()}}, {});
         backend.setClock(QDateTime(QDate(2026, 11, 17), QTime(18, 0)));
         backend.loadNow();
 
@@ -145,7 +147,7 @@ private slots:
         auto at = [](QDate d, QTime t) { return QDateTime(d, t).toUTC().toString(Qt::ISODateWithMs).toUtf8(); };
         write(claude.filePath("a.jsonl"), claudeLine("m1", at({2026, 11, 10}, {9, 0}), 10, 0)
                                               + claudeLine("m2", at({2026, 11, 10}, {20, 0}), 100, 0));
-        Backend backend({claude.path()}, {});
+        Backend backend({{Usage::Claude, claude.path()}}, {});
         backend.setClock(QDateTime(QDate(2026, 11, 17), QTime(12, 0)));
         backend.loadNow();
         backend.setPeriod(Backend::Week);
@@ -159,7 +161,7 @@ private slots:
     {
         QTemporaryDir claude;
         write(claude.filePath("a.jsonl"), claudeLine("m1", "2026-11-17T09:00:00.000Z", 10, 20));
-        Backend backend({claude.path()}, {});
+        Backend backend({{Usage::Claude, claude.path()}}, {});
         backend.setClock(QDateTime(QDate(2026, 11, 17), QTime(12, 0)));
         backend.loadNow();
         QSignalSpy changed(&backend, &Backend::changed);
@@ -167,6 +169,90 @@ private slots:
         backend.loadNow();
         QCOMPARE(changed.count(), 0);
         QCOMPARE(updated.count(), 1);
+    }
+
+    void geminiSplitsCacheAndCountsThoughts()
+    {
+        QTemporaryDir dir;
+        QDir(dir.path()).mkpath("shop/chats");
+        // Settings and prompt history live next to the chats and are ignored.
+        write(dir.filePath("shop/logs.json"), R"([{"tokens":{"input":5}}])");
+        write(dir.filePath("shop/chats/session-1.json"),
+              R"({"sessionId":"s1","messages":[)"
+              R"({"id":"u1","type":"user","timestamp":"2026-11-17T09:00:00.000Z","content":"hi"},)"
+              R"({"id":"g1","type":"gemini","timestamp":"2026-11-17T09:00:05.000Z","model":"gemini-3-pro",)"
+              R"("tokens":{"input":1000,"output":50,"cached":600,"thoughts":20,"tool":5,"total":1075}}]})");
+        const auto records = Usage::merge(Usage::scan({{Usage::Gemini, dir.path()}}, {}));
+        QCOMPARE(records.size(), 1);
+        QCOMPARE(records[0].agent, QString("Gemini CLI"));
+        QCOMPARE(records[0].model, QString("gemini-3-pro"));
+        QCOMPARE(records[0].project, QString("shop"));
+        QCOMPARE(records[0].input, qint64(405));
+        QCOMPARE(records[0].cacheRead, qint64(600));
+        QCOMPARE(records[0].output, qint64(70));
+    }
+
+    void qwenReadsUsageMetadata()
+    {
+        QTemporaryDir dir;
+        QDir(dir.path()).mkpath("p/chats");
+        write(dir.filePath("p/chats/a.jsonl"),
+              R"({"uuid":"q1","sessionId":"s","type":"assistant","timestamp":"2026-11-17T09:00:00.000Z",)"
+              R"("cwd":"/work/api","model":"qwen3-coder","usageMetadata":{"promptTokenCount":300,)"
+              R"("candidatesTokenCount":40,"cachedContentTokenCount":100,"thoughtsTokenCount":0}})" "\n");
+        const auto records = Usage::merge(Usage::scan({{Usage::Qwen, dir.path()}}, {}));
+        QCOMPARE(records.size(), 1);
+        QCOMPARE(records[0].agent, QString("Qwen Code"));
+        QCOMPARE(records[0].project, QString("api"));
+        QCOMPARE(records[0].total(), qint64(340));
+    }
+
+    void openCodeReadsDatabaseAndOldFilesOnce()
+    {
+        QTemporaryDir dir;
+        const QString message =
+            R"({"id":"msg_1","role":"assistant","modelID":"claude-sonnet-5-5","path":{"cwd":"/work/shop"},)"
+            R"("time":{"created":1794906000000},"tokens":{"input":10,"output":20,"reasoning":5,)"
+            R"("cache":{"read":100,"write":7}}})";
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "opencode-test");
+            db.setDatabaseName(dir.filePath("opencode.db"));
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("CREATE TABLE message (id TEXT, session_id TEXT, time_created INTEGER, data TEXT)"));
+            q.prepare("INSERT INTO message VALUES ('msg_1', 'ses_1', 0, ?)");
+            q.addBindValue(message);
+            QVERIFY(q.exec());
+            QVERIFY(q.exec(R"(INSERT INTO message VALUES ('msg_0', 'ses_1', 0, '{"role":"user"}'))"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("opencode-test");
+        // The same message from before OpenCode moved to SQLite.
+        QDir(dir.path()).mkpath("storage/message/ses_1");
+        write(dir.filePath("storage/message/ses_1/msg_1.json"), message.toUtf8());
+
+        const auto records = Usage::merge(Usage::scan({{Usage::OpenCode, dir.path()}}, {}));
+        QCOMPARE(records.size(), 1);
+        QCOMPARE(records[0].agent, QString("OpenCode"));
+        QCOMPARE(records[0].project, QString("shop"));
+        QCOMPARE(records[0].output, qint64(25));
+        QCOMPARE(records[0].total(), qint64(142));
+    }
+
+    void planUsageTakesTheNewestAccountAndAgesOut()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("plan.json");
+        write(path, R"({"version":2,"samples":[{"t":1000,"org":"a","u":{"fh":50,"sd":10}},)"
+                    R"({"t":2000,"org":"b","u":{"fh":7,"sd":30}}]})");
+        QVariantMap plan = Usage::readPlanUsage(path, 3000);
+        QCOMPARE(plan["fiveHour"].toInt(), 7);
+        QCOMPARE(plan["sevenDay"].toInt(), 30);
+        QCOMPARE(plan["history"].toList().size(), 1);
+        plan = Usage::readPlanUsage(path, 2000 + 6 * 3600 * 1000LL);
+        QCOMPARE(plan["fiveHour"].toInt(), -1);
+        QCOMPARE(plan["sevenDay"].toInt(), 30);
+        QVERIFY(Usage::readPlanUsage(dir.filePath("missing.json"), 0).isEmpty());
     }
 
     void compactNumbers()
