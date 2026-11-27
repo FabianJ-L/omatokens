@@ -62,7 +62,8 @@ bin/install
 
 **Uninstall:** `sudo pacman -R tokentally`
 
-**Update:** run the install command again.
+**Update:** run `oma-update`. Every Oma app (Omasql, OmaTask, Token Tally)
+installs it; it updates all of them at once, from GitHub.
 
 ## Shortcuts
 

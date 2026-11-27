@@ -1,0 +1,36 @@
+# Shared by every Oma app package. Each one ships its own copy of oma-update
+# in /usr/share/oma-apps/<app>/; /usr/local/bin/oma-update points at the
+# newest copy, so the command is there as long as any Oma app is installed.
+
+_oma_update_link() {
+  best=""
+  best_version=-1
+  for script in /usr/share/oma-apps/*/oma-update; do
+    [ -f "$script" ] || continue
+    version=$(sed -n 's/^OMA_UPDATE_VERSION=//p' "$script" | head -n1)
+    case "$version" in ''|*[!0-9]*) version=0 ;; esac
+    if [ "$version" -gt "$best_version" ]; then
+      best="$script"
+      best_version="$version"
+    fi
+  done
+  if [ -n "$best" ]; then
+    mkdir -p /usr/local/bin
+    ln -sf "$best" /usr/local/bin/oma-update
+  elif [ -L /usr/local/bin/oma-update ]; then
+    rm -f /usr/local/bin/oma-update
+  fi
+}
+
+post_install() {
+  _oma_update_link
+  echo "  Update all Oma apps later with: oma-update"
+}
+
+post_upgrade() {
+  _oma_update_link
+}
+
+post_remove() {
+  _oma_update_link
+}

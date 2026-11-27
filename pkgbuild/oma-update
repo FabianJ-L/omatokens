@@ -1,0 +1,197 @@
+#!/bin/bash
+# oma-update — installs the latest version of every Oma app on this computer
+# (Omasql, OmaTask, Token Tally, …) in one go.
+#
+#   oma-update                 update every Oma app that is installed
+#   oma-update omasql omatask  only these
+#   oma-update --force         rebuild even when nothing changed
+#   oma-update --no-pull       for checkouts in ~/Work: build them as they are
+#   oma-update --list          show the apps and whether they're up to date
+#
+# Every Oma app package ships this script and records where it came from in
+# /usr/share/oma-apps/<app>/source. oma-update asks GitHub for the newest
+# commit, builds the apps that changed, and installs them with one sudo
+# prompt. A git checkout of an app in $OMA_APPS_DIR (default ~/Work) is used
+# instead of GitHub, so a developer gets their own commits.
+set -uo pipefail
+
+# Raised with every change, so the newest copy of all installed apps is the
+# one on the PATH.
+OMA_UPDATE_VERSION=2
+
+REGISTRY="${OMA_APPS_REGISTRY:-/usr/share/oma-apps}"
+APPS_DIR="${OMA_APPS_DIR:-$HOME/Work}"
+LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/oma-update"
+pull=1
+force=0
+list=0
+only=()
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-pull) pull=0 ;;
+    --force) force=1 ;;
+    --list) list=1 ;;
+    --version) echo "oma-update $OMA_UPDATE_VERSION"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) echo "Unknown option: $arg (see oma-update --help)" >&2; exit 2 ;;
+    *) only+=("$arg") ;;
+  esac
+done
+
+bold=$'\e[1m'; dim=$'\e[2m'; red=$'\e[31m'; green=$'\e[32m'; yellow=$'\e[33m'; off=$'\e[0m'
+[ -t 1 ] || { bold=; dim=; red=; green=; yellow=; off=; }
+
+if [ "$(id -u)" -eq 0 ]; then
+  echo "Run oma-update as your normal user; it asks for sudo when it installs." >&2
+  exit 1
+fi
+
+# A git checkout of the app with its packaging, if there is one.
+checkout_of() {
+  local dir="$APPS_DIR/$1"
+  [ -f "$dir/pkgbuild/PKGBUILD" ] && git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 && echo "$dir"
+}
+
+# KEY=value from an app's source file.
+source_field() {
+  [ -f "$REGISTRY/$1/source" ] && sed -n "s/^$2=//p" "$REGISTRY/$1/source" | head -n1
+}
+
+# Installed apps, plus checkouts in APPS_DIR (installed or not).
+declare -A seen=()
+apps=()
+for file in "$REGISTRY"/*/source; do
+  [ -f "$file" ] || continue
+  app="$(basename "$(dirname "$file")")"
+  pacman -Q "$app" >/dev/null 2>&1 || continue
+  seen[$app]=1; apps+=("$app")
+done
+for pkgbuild in "$APPS_DIR"/*/pkgbuild/PKGBUILD; do
+  [ -f "$pkgbuild" ] || continue
+  app="$(basename "$(dirname "$(dirname "$pkgbuild")")")"
+  [ -n "${seen[$app]:-}" ] || [ -z "$(checkout_of "$app")" ] && continue
+  seen[$app]=1; apps+=("$app")
+done
+
+if [ ${#only[@]} -gt 0 ]; then
+  for name in "${only[@]}"; do
+    [ -n "${seen[$name]:-}" ] || { echo "${red}$name isn't an installed Oma app.${off}" >&2; exit 1; }
+  done
+  apps=("${only[@]}")
+fi
+
+if [ ${#apps[@]} -eq 0 ]; then
+  echo "No Oma apps are installed." >&2
+  exit 1
+fi
+
+# The commit to build: the checkout's (after pulling), or the newest on GitHub.
+wanted_commit() {
+  local app="$1" dir
+  dir="$(checkout_of "$app")"
+  if [ -n "$dir" ]; then
+    git -C "$dir" rev-parse HEAD
+  else
+    git ls-remote "$(source_field "$app" REPO)" HEAD 2>/dev/null | cut -f1
+  fi
+}
+
+if [ $list -eq 1 ]; then
+  for app in "${apps[@]}"; do
+    installed="$(pacman -Q "$app" 2>/dev/null | cut -d' ' -f2)"
+    have="$(source_field "$app" COMMIT)"
+    want="$(wanted_commit "$app")"
+    if [ -z "$installed" ]; then state="not installed"
+    elif [ -z "$want" ]; then state="can't check"
+    elif [ "$have" = "$want" ]; then state="${green}up to date${off}"
+    else state="${yellow}update available${off}"
+    fi
+    from="$(checkout_of "$app")"; from="${from:-$(source_field "$app" REPO)}"
+    printf '%-14s %-10s %s  %s\n' "$app" "${installed:--}" "$state" "${dim}$from${off}"
+  done
+  exit 0
+fi
+
+if ! command -v makepkg >/dev/null || ! command -v git >/dev/null; then
+  echo "Installing the build tools first…"
+  sudo pacman -S --needed --noconfirm base-devel git || exit 1
+fi
+
+mkdir -p "$LOG_DIR"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+packages=()
+built=()
+failed=()
+current=()
+
+for app in "${apps[@]}"; do
+  echo "${bold}==> $app${off}"
+  dir="$(checkout_of "$app")"
+
+  if [ -n "$dir" ]; then
+    if [ $pull -eq 1 ] && git -C "$dir" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+      if [ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ]; then
+        echo "  ${yellow}uncommitted changes in $dir, not pulling${off}"
+      elif ! git -C "$dir" pull --ff-only --quiet; then
+        echo "  ${yellow}couldn't pull $dir (diverged?), using it as it is${off}"
+      fi
+    fi
+    dirty="$(git -C "$dir" status --porcelain --untracked-files=no)"
+  else
+    dirty=""
+  fi
+
+  want="$(wanted_commit "$app")"
+  have="$(source_field "$app" COMMIT)"
+  if [ $force -eq 0 ] && [ -z "$dirty" ] && [ -n "$want" ] && [ "$want" = "$have" ] && pacman -Q "$app" >/dev/null 2>&1; then
+    echo "  ${dim}up to date (${want:0:7})${off}"
+    current+=("$app")
+    continue
+  fi
+
+  if [ -z "$dir" ]; then
+    repo="$(source_field "$app" REPO)"
+    echo "  downloading $repo…"
+    if ! git clone --quiet --depth 1 "$repo" "$WORK/$app"; then
+      echo "  ${red}couldn't download it${off}"
+      failed+=("$app"); continue
+    fi
+    dir="$WORK/$app"
+  fi
+
+  log="$LOG_DIR/$app.log"
+  echo "  building ${want:0:7}… ${dim}(log: $log)${off}"
+  # -s installs missing build dependencies (asks for sudo if any are missing).
+  if ! (cd "$dir/pkgbuild" && makepkg -fs --noconfirm) >"$log" 2>&1; then
+    echo "  ${red}build failed, last lines:${off}"
+    tail -n 15 "$log" | sed 's/^/    /'
+    failed+=("$app"); continue
+  fi
+
+  while IFS= read -r file; do
+    [[ "$file" == *-debug-* ]] && continue
+    [ -f "$file" ] && packages+=("$file")
+  done < <(cd "$dir/pkgbuild" && makepkg --packagelist 2>/dev/null)
+  built+=("$app")
+done
+
+echo
+if [ ${#packages[@]} -gt 0 ]; then
+  echo "${bold}==> Installing ${built[*]}${off}"
+  if sudo pacman -U --noconfirm "${packages[@]}"; then
+    echo "${green}Updated: ${built[*]}${off}"
+    echo "${dim}Restart the apps that are open to use the new versions.${off}"
+  else
+    echo "${red}Installing failed.${off}" >&2
+    exit 1
+  fi
+elif [ ${#failed[@]} -eq 0 ]; then
+  echo "${green}Everything is up to date.${off}"
+fi
+
+if [ ${#failed[@]} -gt 0 ]; then
+  echo "${red}Not updated: ${failed[*]}${off}" >&2
+  exit 1
+fi
