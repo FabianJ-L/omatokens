@@ -65,7 +65,7 @@ bin/install
 OmaTokens used to be called Token Tally (`tokentally`); `oma-update` swaps
 the old package for the new one.
 
-**Update:** run `oma-update`. Every Oma app (Omasql, OmaTask, OmaTokens)
+**Update:** run `oma-update`. Every [Oma app](https://github.com/FabianJ-L/oma) (Omasql, OmaTask, OmaTokens)
 installs it; it updates all of them at once, from GitHub.
 
 ## Shortcuts
